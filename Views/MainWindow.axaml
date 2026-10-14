@@ -1,0 +1,65 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:GeoDraw.ViewModels"
+        xmlns:controls="using:GeoDraw.Controls"
+        x:Class="GeoDraw.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="GeoDraw"
+        Width="1280" Height="820">
+
+  <Design.DataContext>
+    <vm:MainViewModel />
+  </Design.DataContext>
+
+  <DockPanel>
+
+    <!-- 顶部工具栏 -->
+    <Border DockPanel.Dock="Top" Padding="6" Background="#f4f4f4"
+            BorderBrush="#ccc" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <Button Content="Select" Command="{Binding SetToolCommand}" CommandParameter="Select"/>
+        <Button Content="Point"  Command="{Binding SetToolCommand}" CommandParameter="Point"/>
+        <Button Content="Line"   Command="{Binding SetToolCommand}" CommandParameter="Line"/>
+        <Button Content="Rect"   Command="{Binding SetToolCommand}" CommandParameter="Rect"/>
+        <Button Content="Circle" Command="{Binding SetToolCommand}" CommandParameter="Circle"/>
+        <Button Content="Ellipse" Command="{Binding SetToolCommand}" CommandParameter="Ellipse"/>
+        <Separator/>
+        <Button Content="Delete" Command="{Binding DeleteSelectedCommand}"/>
+        <Button Content="Clear"  Command="{Binding ClearAllCommand}"/>
+        <Button Content="Export SVG…" Click="OnExportSvgClicked"/>
+      </StackPanel>
+    </Border>
+
+    <!-- 右侧信息面板 -->
+    <Border DockPanel.Dock="Right" Width="300" Padding="8"
+            Background="#fafafa" BorderBrush="#ccc" BorderThickness="1,0,0,0">
+      <Grid RowDefinitions="Auto,*,Auto">
+        <TextBlock Grid.Row="0" Text="Selection" FontWeight="Bold"/>
+        <ScrollViewer Grid.Row="1" Margin="0,4,0,8">
+          <TextBlock Text="{Binding SelectedSummary}" TextWrapping="Wrap"/>
+        </ScrollViewer>
+        <StackPanel Grid.Row="2">
+          <TextBlock Text="Log" FontWeight="Bold"/>
+          <ScrollViewer Height="200">
+            <TextBlock Text="{Binding LogText}" TextWrapping="Wrap"
+                       FontSize="11" Foreground="#444"/>
+          </ScrollViewer>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- 底部 CLI -->
+    <TextBox DockPanel.Dock="Bottom" Margin="6"
+             Text="{Binding CliInput}"
+             PlaceholderText="select p1 | clear | help"
+             KeyDown="OnCliKeyDown"/>
+
+    <!-- 画布 -->
+    <controls:DrawingCanvas x:Name="DrawCanvas"
+                            Document="{Binding Document}"
+                            SelectedObjects="{Binding SelectedObjects}"
+                            Tool="{Binding Tool}"
+                            CurrentStyle="{Binding CurrentStyle}"
+                            ViewMode="{Binding ViewMode}"/>
+  </DockPanel>
+</Window>

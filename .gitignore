@@ -1,0 +1,38 @@
+# 构建输出
+bin/
+obj/
+publish/
+*.pdb
+*.cache
+*.binlog
+PublishOutputs.*.txt
+
+# NuGet
+*.nupkg
+*.snupkg
+project.assets.json
+project.nuget.cache
+*.nuget.props
+*.nuget.targets
+*.nuget.dgspec.json
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.userprefs
+
+# System
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# tmp
+*.tmp
+*.bak
+*.swp
+run.txt
+pwd_report.md
