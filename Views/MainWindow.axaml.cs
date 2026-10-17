@@ -1,10 +1,14 @@
 using System;
 using System.IO;
+using System.Linq;
+using Avalonia;
+using Avalonia.Media.Imaging;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using GeoDraw.ViewModels;
+using GeoDraw.Services;
 
 namespace GeoDraw.Views;
 
@@ -19,7 +23,10 @@ public partial class MainWindow : Window
     {
         base.OnDataContextChanged(e);
         if (DataContext is MainViewModel vm)
+        {
             vm.Canvas = DrawCanvas;
+            DrawCanvas.Highlighter = vm.Highlighter;
+        }
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -49,6 +56,175 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    // 菜单项
+    private void OnToolMenuClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && sender is MenuItem { Tag: string name })
+            vm.SetToolCommand.Execute(name);
+    }
+
+    private void OnViewMenuClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && sender is MenuItem { Tag: string name })
+            vm.SetViewCommand.Execute(name);
+    }
+
+    private void OnOperateMenuClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (sender is not MenuItem { Tag: string name }) return;
+
+        switch (name)
+        {
+            case "Rotate":
+                OnRotateClicked(sender, e);
+                break;
+            case "ReflectPoint":
+                vm.ReflectAcrossPointCommand.Execute(null);
+                break;
+            case "ReflectLine":
+                vm.ReflectAcrossLineCommand.Execute(null);
+                break;
+            case "Duplicate":
+                vm.DuplicateCommand.Execute(null);
+                break;
+            case "Delete":
+                vm.DeleteSelectedCommand.Execute(null);
+                break;
+            case "Clear":
+                vm.ClearAllCommand.Execute(null);
+                break;
+        }
+    }
+
+    private void OnFileMenuClicked(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string tag }) return;
+        switch (tag)
+        {
+            case "ImportJson":  OnImportJsonClicked(sender, e);  break;
+            case "ExportJson":  OnExportJsonClicked(sender, e);  break;
+            case "ExportSvg":   OnExportSvgClicked(sender, e);   break;
+            case "ExportPng":   OnExportPngClicked(sender, e);   break;
+        }
+    }
+
+    private async void OnImportJsonClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import JSON",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("GeoDraw JSON") { Patterns = ["*.json"] }
+            ]
+        });
+        if (files.Count == 0) return;
+
+        try
+        {
+            await using var stream = await files[0].OpenReadAsync();
+            using var reader = new StreamReader(stream);
+            var json = await reader.ReadToEndAsync();
+            var doc = DocumentSerializer.Deserialize(json);
+            vm.LoadDocument(doc);
+        }
+        catch (Exception ex)
+        {
+            vm.LogText = (vm.LogText.Length == 0 ? "" : vm.LogText + "\n")
+                       + $"import failed: {ex.Message}";
+        }
+    }
+
+    private async void OnExportJsonClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export JSON",
+            DefaultExtension = "json",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("GeoDraw JSON") { Patterns = ["*.json"] }
+            ]
+        });
+        if (file == null) return;
+
+        try
+        {
+            var json = vm.ExportJson();
+            await using var stream = await file.OpenWriteAsync();
+            await using var writer = new StreamWriter(stream);
+            await writer.WriteAsync(json);
+            vm.LogText += (vm.LogText.Length == 0 ? "" : "\n") + "exported JSON";
+        }
+        catch (Exception ex)
+        {
+            vm.LogText += (vm.LogText.Length == 0 ? "" : "\n")
+                        + $"export failed: {ex.Message}";
+        }
+    }
+
+    private async void OnExportPngClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export PNG",
+            DefaultExtension = "png",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("PNG") { Patterns = ["*.png"] }
+            ]
+        });
+        if (file == null) return;
+
+        try
+        {
+            var width = Math.Max(1, (int)DrawCanvas.Bounds.Width);
+            var height = Math.Max(1, (int)DrawCanvas.Bounds.Height);
+
+            // 临时清除选择，避免选中高亮进入导出图
+            var saved = vm.SelectedObjects.ToList();
+            vm.SelectedObjects.Clear();
+
+            using var bitmap = new RenderTargetBitmap(
+                new PixelSize(width, height),
+                new Vector(96, 96));
+            bitmap.Render(DrawCanvas);
+
+            await using (var stream = await file.OpenWriteAsync())
+            {
+                bitmap.Save(stream, PngBitmapEncoderOptions.Default);
+            }
+
+            foreach (var o in saved)
+                vm.SelectedObjects.Add(o);
+
+            vm.LogText += (vm.LogText.Length == 0 ? "" : "\n")
+                        + $"exported PNG {width}×{height}";
+        }
+        catch (Exception ex)
+        {
+            vm.LogText += (vm.LogText.Length == 0 ? "" : "\n")
+                        + $"export failed: {ex.Message}";
+        }
+    }
+	
+    // 旋转对话框
+    private async void OnRotateClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var w = new RotateWindow { DataContext = vm };
+        await w.ShowDialog(this);
+    }
+
+    // SVG 导出
     private async void OnExportSvgClicked(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;
@@ -57,10 +233,7 @@ public partial class MainWindow : Window
         {
             Title = "Export SVG",
             DefaultExtension = "svg",
-            FileTypeChoices =
-            [
-                new FilePickerFileType("SVG") { Patterns = ["*.svg"] }
-            ]
+            FileTypeChoices = [new FilePickerFileType("SVG") { Patterns = ["*.svg"] }]
         });
         if (file == null) return;
 

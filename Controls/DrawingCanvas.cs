@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Globalization;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
@@ -8,6 +9,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using GeoDraw.Geometry;
 using GeoDraw.Models;
+using GeoDraw.Services;
 using PathSegment = GeoDraw.Models.PathSegment;
 
 namespace GeoDraw.Controls;
@@ -58,6 +60,9 @@ public sealed class DrawingCanvas : Control
         get => GetValue(ViewModeProperty);
         set => SetValue(ViewModeProperty, value);
     }
+
+    /// <summary>由 MainWindow 注入；Render 时读取，不参与属性通知。</summary>
+    public Highlighter? Highlighter { get; set; }
 
     private bool _pointerDown;
     private Point _pressPoint;
@@ -135,11 +140,15 @@ public sealed class DrawingCanvas : Control
             context.DrawRectangle(
                 new Pen(new SolidColorBrush(Color.FromRgb(0, 120, 215)), 1), r);
         }
+
+        if (doc != null && ViewMode != IdViewMode.None)
+            DrawIdLabels(context, doc);
     }
 
     private void DrawObject(DrawingContext context, DrawObject obj)
     {
         var selected = SelectedObjects?.Contains(obj) == true;
+        var stroke = Highlighter?.Get(obj.Id) ?? obj.Style.StrokeColor;
 
         switch (obj.Type)
         {
@@ -151,8 +160,7 @@ public sealed class DrawingCanvas : Control
                     context.DrawEllipse(hl, null, obj.Geo,
                         obj.Style.Radius + 3.5, obj.Style.Radius + 3.5);
                 }
-                var brush = new SolidColorBrush(obj.Style.StrokeColor);
-                context.DrawEllipse(brush, null, obj.Geo,
+                context.DrawEllipse(new SolidColorBrush(stroke), null, obj.Geo,
                     obj.Style.Radius, obj.Style.Radius);
                 break;
             }
@@ -167,10 +175,38 @@ public sealed class DrawingCanvas : Control
                         obj.Style.Width + 5);
                     context.DrawGeometry(null, hlPen, geo);
                 }
-                var pen = new Pen(new SolidColorBrush(obj.Style.StrokeColor), obj.Style.Width);
+                var pen = new Pen(new SolidColorBrush(stroke), obj.Style.Width);
                 context.DrawGeometry(null, pen, geo);
                 break;
             }
+        }
+    }
+
+    private void DrawIdLabels(DrawingContext context, Document doc)
+    {
+        foreach (var obj in doc.Objects)
+        {
+            var show = (ViewMode == IdViewMode.PointIds && obj.Type == DrawObjectType.Point)
+                    || (ViewMode == IdViewMode.PathIds && obj.Type == DrawObjectType.Path);
+            if (!show) continue;
+
+            Point anchor;
+            if (obj.Type == DrawObjectType.Point)
+            {
+                anchor = new Point(obj.Geo.X + obj.Style.Radius + 3,
+                                   obj.Geo.Y - obj.Style.Radius - 14);
+            }
+            else
+            {
+                anchor = obj.Path?.StartPoint() is { } sp
+                    ? new Point(sp.X + 6, sp.Y - 16)
+                    : default;
+            }
+
+            var ft = new FormattedText(obj.Id, CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight, Typeface.Default, 11,
+                new SolidColorBrush(Color.FromRgb(50, 50, 50)));
+            context.DrawText(ft, anchor);
         }
     }
 

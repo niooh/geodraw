@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Media;
 
@@ -71,6 +74,13 @@ public sealed class PathData
 
         _pointsCache = pts;
         return pts;
+    }
+	public Point? StartPoint()
+    {
+        foreach (var seg in Segments)
+            if (seg.Command == PathCommand.MoveTo && seg.Points.Length > 0)
+                return seg.Points[0];
+        return null;
     }
 
     /// <summary>转换为 Avalonia 的 StreamGeometry，用于实际渲染。</summary>
@@ -147,6 +157,87 @@ public sealed class PathData
         return string.Join(" ", parts);
     }
 
+    /// <summary>转成 Go 原型约定的扁平 token 数组：["M", x, y, "L", x, y, ...]。</summary>
+    public JsonArray ToJsonTokens()
+    {
+        var arr = new JsonArray();
+        foreach (var seg in Segments)
+        {
+            arr.Add(seg.Command switch
+            {
+                PathCommand.MoveTo => "M",
+                PathCommand.LineTo => "L",
+                PathCommand.QuadTo => "Q",
+                PathCommand.CubicTo => "C",
+                _ => "Z"
+            });
+            foreach (var pt in seg.Points)
+            {
+                arr.Add(pt.X);
+                arr.Add(pt.Y);
+            }
+        }
+        return arr;
+    }
+
+    /// <summary>从扁平 token 数组还原 PathData。</summary>
+    public static PathData FromJsonTokens(JsonArray arr)
+    {
+        var path = new PathData();
+        PathCommand? currentCmd = null;
+        var currentPoints = new List<Point>();
+
+        void Flush()
+        {
+            if (currentCmd is { } cmd)
+            {
+                path.Segments.Add(new PathSegment
+                {
+                    Command = cmd,
+                    Points = currentPoints.ToArray()
+                });
+            }
+            currentPoints.Clear();
+            currentCmd = null;
+        }
+
+        var i = 0;
+        while (i < arr.Count)
+        {
+            var node = arr[i];
+            if (node?.GetValueKind() == JsonValueKind.String)
+            {
+                Flush();
+                var s = node.GetValue<string>();
+                currentCmd = s switch
+                {
+                    "M" => PathCommand.MoveTo,
+                    "L" => PathCommand.LineTo,
+                    "Q" => PathCommand.QuadTo,
+                    "C" => PathCommand.CubicTo,
+                    "Z" => PathCommand.Close,
+                    _ => throw new InvalidDataException($"unknown command: {s}")
+                };
+                i++;
+                continue;
+            }
+
+            if (currentCmd == null)
+                throw new InvalidDataException("number before command");
+
+            if (i + 1 >= arr.Count)
+                throw new InvalidDataException("odd number of coordinates");
+
+            var x = arr[i]!.GetValue<double>();
+            var y = arr[i + 1]!.GetValue<double>();
+            currentPoints.Add(new Point(x, y));
+            i += 2;
+        }
+
+        Flush();
+        return path;
+    }
+	
     private static void AppendQuad(List<Point> dst, Point p0, Point p1, Point p2, int n)
     {
         for (var i = 1; i <= n; i++)

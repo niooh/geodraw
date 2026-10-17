@@ -2,10 +2,16 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Media;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GeoDraw.Controls;
+using GeoDraw.Geometry;
 using GeoDraw.Models;
+using GeoDraw.Services;
 
 namespace GeoDraw.ViewModels;
 
@@ -13,54 +19,170 @@ public partial class MainViewModel : ObservableObject
 {
     public Document Document { get; } = new();
     public ObservableCollection<DrawObject> SelectedObjects { get; } = new();
+    public Highlighter Highlighter { get; } = new();
+
+    public DrawingCanvas? Canvas { get; set; }
 
     [ObservableProperty]
     private EditorTool _tool = EditorTool.Select;
 
-    [ObservableProperty]
-    private DrawStyle _currentStyle = new();
+    public string ToolLabel => $"Tool: {Tool}";
+    partial void OnToolChanged(EditorTool value) => OnPropertyChanged(nameof(ToolLabel));
 
     [ObservableProperty]
     private IdViewMode _viewMode = IdViewMode.None;
 
-    [ObservableProperty]
-    private string _logText = "";
+    public string ViewLabel => $"View: {ViewMode}";
+    partial void OnViewModeChanged(IdViewMode value) => OnPropertyChanged(nameof(ViewLabel));
 
-    [ObservableProperty]
-    private string _selectedSummary = "none";
+    [ObservableProperty] private DrawStyle _currentStyle = new();
+    [ObservableProperty] private string _logText = "";
+    [ObservableProperty] private string _selectedSummary = "none";
+    [ObservableProperty] private string _cliInput = "";
 
-    [ObservableProperty]
-    private string _cliInput = "";
+    // 属性面板字段
+    private bool _syncingSelection;
 
-    /// <summary>由 MainWindow 注入，用于属性变更后主动触发重绘。</summary>
-    public DrawingCanvas? Canvas { get; set; }
+    [ObservableProperty] private bool _hasSingleSelection;
+    [ObservableProperty] private bool _isPointSelected;
+    [ObservableProperty] private bool _isPathSelected;
+    [ObservableProperty] private string _selId = "";
+    [ObservableProperty] private double _selX;
+    [ObservableProperty] private double _selY;
+    [ObservableProperty] private double _selRadius = 5;
+    [ObservableProperty] private double _selWidth = 2;
+    [ObservableProperty] private int _selSegmentCount;
+
+    // 旋转参数
+    private bool _rotateClockwise = true;
+    public bool RotateClockwise
+    {
+        get => _rotateClockwise;
+        set
+        {
+            if (_rotateClockwise == value) return;
+            _rotateClockwise = value;
+            OnPropertyChanged(nameof(RotateClockwise));
+            OnPropertyChanged(nameof(RotateCounterClockwise));
+        }
+    }
+
+    public bool RotateCounterClockwise
+    {
+        get => !_rotateClockwise;
+        set => RotateClockwise = !value;
+    }
+
+    [ObservableProperty] private double _rotateAngle = 90;
+    [ObservableProperty] private double _rotateCount = 1;
 
     public MainViewModel()
     {
         SelectedObjects.CollectionChanged += (_, _) => UpdateSelectionSummary();
     }
 
-    private void UpdateSelectionSummary()
+    // 属性回写
+    partial void OnSelXChanged(double value)
     {
-        if (SelectedObjects.Count == 0)
+        if (_syncingSelection) return;
+        if (SingleSelectedPoint() is { } p)
         {
-            SelectedSummary = "none";
-            return;
+            p.Geo = new Point(value, p.Geo.Y);
+            Canvas?.InvalidateVisual();
         }
-
-        if (SelectedObjects.Count > 1)
-        {
-            SelectedSummary = $"{SelectedObjects.Count} objects: " +
-                              string.Join(", ", SelectedObjects.Select(o => o.Id));
-            return;
-        }
-
-        var o = SelectedObjects[0];
-        SelectedSummary = o.Type == DrawObjectType.Point
-            ? $"{o.Id} · point  ({o.Geo.X:0.#}, {o.Geo.Y:0.#})"
-            : $"{o.Id} · path   ({o.Path?.Segments.Count ?? 0} segments)";
     }
 
+    partial void OnSelYChanged(double value)
+    {
+        if (_syncingSelection) return;
+        if (SingleSelectedPoint() is { } p)
+        {
+            p.Geo = new Point(p.Geo.X, value);
+            Canvas?.InvalidateVisual();
+        }
+    }
+
+    partial void OnSelRadiusChanged(double value)
+    {
+        if (_syncingSelection) return;
+        if (SingleSelectedPoint() is { } p)
+        {
+            p.Style.Radius = value;
+            Canvas?.InvalidateVisual();
+        }
+    }
+
+    partial void OnSelWidthChanged(double value)
+    {
+        if (_syncingSelection) return;
+        if (SingleSelectedPath() is { } p)
+        {
+            p.Style.Width = value;
+            Canvas?.InvalidateVisual();
+        }
+    }
+
+    private DrawObject? SingleSelectedPoint() =>
+        SelectedObjects.Count == 1 && SelectedObjects[0].Type == DrawObjectType.Point
+            ? SelectedObjects[0] : null;
+
+    private DrawObject? SingleSelectedPath() =>
+        SelectedObjects.Count == 1 && SelectedObjects[0].Type == DrawObjectType.Path
+            ? SelectedObjects[0] : null;
+
+    private void UpdateSelectionSummary()
+    {
+        _syncingSelection = true;
+        try
+        {
+            if (SelectedObjects.Count == 0)
+            {
+                SelectedSummary = "none";
+                HasSingleSelection = false;
+                IsPointSelected = false;
+                IsPathSelected = false;
+                SelId = "";
+                return;
+            }
+
+            if (SelectedObjects.Count > 1)
+            {
+                SelectedSummary = $"{SelectedObjects.Count} objects: " +
+                    string.Join(", ", SelectedObjects.Select(o => o.Id));
+                HasSingleSelection = false;
+                IsPointSelected = false;
+                IsPathSelected = false;
+                SelId = "";
+                return;
+            }
+
+            var o = SelectedObjects[0];
+            HasSingleSelection = true;
+            SelId = o.Id;
+            IsPointSelected = o.Type == DrawObjectType.Point;
+            IsPathSelected = o.Type == DrawObjectType.Path;
+
+            if (IsPointSelected)
+            {
+                SelX = o.Geo.X;
+                SelY = o.Geo.Y;
+                SelRadius = o.Style.Radius;
+                SelectedSummary = $"{o.Id} · point  ({o.Geo.X:0.#}, {o.Geo.Y:0.#})";
+            }
+            else
+            {
+                SelWidth = o.Style.Width;
+                SelSegmentCount = o.Path?.Segments.Count ?? 0;
+                SelectedSummary = $"{o.Id} · path   ({SelSegmentCount} segments)";
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+    }
+
+    // 命令
     [RelayCommand]
     private void SetTool(string? name)
     {
@@ -68,6 +190,16 @@ public partial class MainViewModel : ObservableObject
         {
             Tool = t;
             Log($"tool: {t}");
+        }
+    }
+
+    [RelayCommand]
+    private void SetView(string? name)
+    {
+        if (Enum.TryParse<IdViewMode>(name, out var v))
+        {
+            ViewMode = v;
+            Log($"view: {v}");
         }
     }
 
@@ -92,6 +224,186 @@ public partial class MainViewModel : ObservableObject
         Log("cleared");
     }
 
+    // 变换
+    private DrawObject CloneWithNewId(DrawObject o) => new()
+    {
+        Id = Document.NextId(o.Type),
+        Type = o.Type,
+        Style = o.Style.Clone(),
+        Geo = o.Geo,
+        Path = o.Path
+    };
+
+    private void ReplaceSelectionWith(System.Collections.Generic.List<DrawObject> created)
+    {
+        if (created.Count == 0)
+        {
+            Log("nothing to transform");
+            return;
+        }
+        foreach (var c in created) Document.Objects.Add(c);
+        SelectedObjects.Clear();
+        foreach (var c in created) SelectedObjects.Add(c);
+    }
+
+    [RelayCommand]
+    private void Duplicate()
+    {
+        if (SelectedObjects.Count == 0) return;
+        var created = SelectedObjects.Select(o =>
+        {
+            var c = CloneWithNewId(o);
+            if (o.Type == DrawObjectType.Point)
+                c.Geo = new Point(o.Geo.X + 16, o.Geo.Y + 16);
+            else if (o.Path != null)
+                c.Path = o.Path.Transform(p => new Point(p.X + 16, p.Y + 16));
+            return c;
+        }).ToList();
+        ReplaceSelectionWith(created);
+        Log($"duplicate: {created.Count} object(s)");
+    }
+
+    [RelayCommand]
+    private void ReflectAcrossPoint()
+    {
+        var center = SelectedObjects.LastOrDefault(o => o.Type == DrawObjectType.Point);
+        if (center == null)
+        {
+            Log("select a center point plus objects to transform");
+            return;
+        }
+
+        var created = new System.Collections.Generic.List<DrawObject>();
+        foreach (var o in SelectedObjects.ToList())
+        {
+            if (o == center) continue;
+            var c = CloneWithNewId(o);
+            if (o.Type == DrawObjectType.Point)
+                c.Geo = GeometryHelper.ReflectThroughPoint(o.Geo, center.Geo);
+            else if (o.Path != null)
+                c.Path = o.Path.Transform(p => GeometryHelper.ReflectThroughPoint(p, center.Geo));
+            created.Add(c);
+        }
+        ReplaceSelectionWith(created);
+        if (created.Count > 0)
+            Log($"reflect point: {created.Count} object(s) about {center.Id}");
+    }
+
+    [RelayCommand]
+    private void ReflectAcrossLine()
+    {
+        var axis = SelectedObjects.LastOrDefault(
+            o => o.Type == DrawObjectType.Path && o.Path != null);
+        if (axis?.Path == null)
+        {
+            Log("select an axis line plus objects to transform");
+            return;
+        }
+
+        var pts = axis.Path.ToPoints();
+        if (pts.Count < 2)
+        {
+            Log($"axis {axis.Id} is degenerate");
+            return;
+        }
+
+        var ax1 = pts[0];
+        var ax2 = pts[^1];
+        if (GeometryHelper.Distance(ax1, ax2) < 1.0)
+            ax2 = pts[pts.Count / 2];
+        if (GeometryHelper.Distance(ax1, ax2) < 1.0)
+        {
+            Log($"axis {axis.Id} is degenerate");
+            return;
+        }
+
+        var created = new System.Collections.Generic.List<DrawObject>();
+        foreach (var o in SelectedObjects.ToList())
+        {
+            if (o == axis) continue;
+            var c = CloneWithNewId(o);
+            if (o.Type == DrawObjectType.Point)
+                c.Geo = GeometryHelper.ReflectPoint(o.Geo, ax1, ax2);
+            else if (o.Path != null)
+                c.Path = o.Path.Transform(p => GeometryHelper.ReflectPoint(p, ax1, ax2));
+            created.Add(c);
+        }
+        ReplaceSelectionWith(created);
+        if (created.Count > 0)
+            Log($"reflect line: {created.Count} object(s) about {axis.Id}");
+    }
+
+    [RelayCommand]
+    private void Rotate()
+    {
+        if (SelectedObjects.Count == 0)
+        {
+            Log("select objects to rotate");
+            return;
+        }
+
+        var (center, centerObj) = ComputeRotateCenter();
+        if (!HasRotateCenter)
+        {
+            Log("no rotation center");
+            return;
+        }
+
+        var sign = RotateClockwise ? 1.0 : -1.0;
+        var count = Math.Max(1, (int)Math.Round(RotateCount));
+        var created = new System.Collections.Generic.List<DrawObject>();
+
+        for (var i = 1; i <= count; i++)
+        {
+            var step = sign * RotateAngle * i;
+            foreach (var o in SelectedObjects.ToList())
+            {
+                if (o == centerObj) continue;
+                var c = CloneWithNewId(o);
+                if (o.Type == DrawObjectType.Point)
+                    c.Geo = GeometryHelper.RotatePoint(o.Geo, center, step);
+                else if (o.Path != null)
+                    c.Path = o.Path.Transform(p => GeometryHelper.RotatePoint(p, center, step));
+                created.Add(c);
+            }
+        }
+
+        ReplaceSelectionWith(created);
+        if (created.Count == 0) return;
+
+        var dir = RotateClockwise ? "CW" : "CCW";
+        Log($"rotate: {created.Count} new object(s), " +
+            $"{RotateAngle:0.#}° × {count} {dir}, center ({center.X:0},{center.Y:0})");
+    }
+
+    private bool HasRotateCenter;
+
+    private (Point center, DrawObject? centerObj) ComputeRotateCenter()
+    {
+        for (var i = SelectedObjects.Count - 1; i >= 0; i--)
+        {
+            if (SelectedObjects[i].Type == DrawObjectType.Point)
+            {
+                HasRotateCenter = true;
+                return (SelectedObjects[i].Geo, SelectedObjects[i]);
+            }
+        }
+
+        if (SelectedObjects.Count == 0)
+        {
+            HasRotateCenter = false;
+            return (default, null);
+        }
+
+        var r = GeometryHelper.BoundingBox(SelectedObjects[0]);
+        for (var i = 1; i < SelectedObjects.Count; i++)
+            r = r.Union(GeometryHelper.BoundingBox(SelectedObjects[i]));
+
+        HasRotateCenter = true;
+        return (new Point(r.X + r.Width / 2, r.Y + r.Height / 2), null);
+    }
+
+    // CLI
     [RelayCommand]
     private void RunCli()
     {
@@ -111,17 +423,50 @@ public partial class MainViewModel : ObservableObject
                     else Log($"not found: {id}");
                 }
                 break;
+            case "which" when parts.Length > 1:
+                RunWhich(parts[1]);
+                break;
             case "clear":
                 ClearAll();
                 break;
             case "help":
-                Log("commands: select <id...> | clear | help");
+                Log("commands: select <id...> | which <id> | clear | help");
                 break;
             default:
                 Log($"unknown command: {parts[0]}");
                 break;
         }
     }
+
+    private void RunWhich(string id)
+    {
+        var o = Document.Find(id);
+        if (o == null)
+        {
+            Log($"not found: {id}");
+            return;
+        }
+
+        var hl = Color.FromRgb(255, 0, 0);
+        if (o.Type == DrawObjectType.Path && IsRed(o.Style.StrokeColor))
+            hl = Color.FromRgb(0, 200, 0);
+
+        Highlighter.Set(id, hl, TimeSpan.FromSeconds(2));
+        Canvas?.InvalidateVisual();
+        Log($"which {id}");
+
+        var captured = id;
+        _ = Task.Delay(2000).ContinueWith(_ =>
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                Highlighter.Clear(captured);
+                Canvas?.InvalidateVisual();
+            });
+        });
+    }
+
+    private static bool IsRed(Color c) => c.R > 0xb0 && c.G < 0x40 && c.B < 0x40;
 
     public string BuildSvg(int width, int height)
     {
@@ -148,6 +493,21 @@ public partial class MainViewModel : ObservableObject
         sb.AppendLine("</svg>");
         return sb.ToString();
     }
+
+    /// <summary>用新文档替换当前文档，重置选择和状态。</summary>
+    public void LoadDocument(Document newDoc)
+    {
+        Document.Objects.Clear();
+        foreach (var o in newDoc.Objects)
+            Document.Objects.Add(o);
+
+        Document.PCounter = newDoc.PCounter;
+        Document.LCounter = newDoc.LCounter;
+        SelectedObjects.Clear();
+        Log($"imported {Document.Objects.Count} object(s)");
+    }
+
+    public string ExportJson() => DocumentSerializer.Serialize(Document);
 
     private void Log(string line)
     {

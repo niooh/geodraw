@@ -10,6 +10,18 @@ public sealed class Document
     private int _pCount;
     private int _lCount;
 
+    public int PCounter
+    {
+        get => _pCount;
+        set => _pCount = value;
+    }
+
+    public int LCounter
+    {
+        get => _lCount;
+        set => _lCount = value;
+    }
+	
     public string NextId(DrawObjectType type) =>
         type == DrawObjectType.Point ? $"p{++_pCount}" : $"l{++_lCount}";
 
