@@ -49,13 +49,21 @@
           <Button x:Name="OperateButton" Content="Operate ▾">
             <Button.Flyout>
               <MenuFlyout>
+                <MenuItem Header="Connect (one curve)" Tag="ConnectOneCurve" Click="OnOperateMenuClicked"/>
+                <MenuItem Header="Connect (M)" Tag="ConnectM" Click="OnOperateMenuClicked"/>
+                <MenuItem Header="Connect (Q)" Tag="ConnectQ" Click="OnOperateMenuClicked"/>
+                <MenuItem Header="Connect (C)" Tag="ConnectC" Click="OnOperateMenuClicked"/>
+                <Separator/>
                 <MenuItem Header="Rotate…" Tag="Rotate" Click="OnOperateMenuClicked"/>
                 <MenuItem Header="Reflect across point" Tag="ReflectPoint" Click="OnOperateMenuClicked"/>
-                <MenuItem Header="Reflect across line"  Tag="ReflectLine"  Click="OnOperateMenuClicked"/>
+                <MenuItem Header="Reflect across line" Tag="ReflectLine" Click="OnOperateMenuClicked"/>
                 <MenuItem Header="Duplicate" Tag="Duplicate" Click="OnOperateMenuClicked"/>
                 <Separator/>
+                <MenuItem Header="Next object (Ctrl+→)" Tag="SelectNext" Click="OnOperateMenuClicked"/>
+                <MenuItem Header="Prev object (Ctrl+←)" Tag="SelectPrev" Click="OnOperateMenuClicked"/>
+                <Separator/>
                 <MenuItem Header="Delete selected" Tag="Delete" Click="OnOperateMenuClicked"/>
-                <MenuItem Header="Clear all"       Tag="Clear"  Click="OnOperateMenuClicked"/>
+                <MenuItem Header="Clear all" Tag="Clear" Click="OnOperateMenuClicked"/>
               </MenuFlyout>
             </Button.Flyout>
           </Button>
@@ -71,7 +79,7 @@
             </Button.Flyout>
           </Button>
 
-          <Button Content="Style" IsEnabled="False"/>
+          <Button Content="Style" Click="OnStyleClicked"/>
         </StackPanel>
 
         <TextBox Grid.Column="1" Margin="8,0,0,0"

@@ -1,0 +1,42 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:GeoDraw.ViewModels"
+        x:Class="GeoDraw.Views.StyleWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Style (applies to new objects)"
+        Width="340" Height="360"
+        WindowStartupLocation="CenterOwner">
+
+  <StackPanel Margin="16" Spacing="10">
+    <TextBlock Text="Stroke color" FontWeight="Bold"/>
+    <WrapPanel ItemWidth="80" ItemHeight="32">
+      <Button Content="Black"  Tag="Black"  Click="OnColorClicked" Margin="0,0,4,4"/>
+      <Button Content="Red"    Tag="Red"    Click="OnColorClicked" Margin="0,0,4,4"/>
+      <Button Content="Blue"   Tag="Blue"   Click="OnColorClicked" Margin="0,0,4,4"/>
+      <Button Content="Green"  Tag="Green"  Click="OnColorClicked" Margin="0,0,4,4"/>
+      <Button Content="Yellow" Tag="Yellow" Click="OnColorClicked" Margin="0,0,4,4"/>
+      <Button Content="Purple" Tag="Purple" Click="OnColorClicked" Margin="0,0,4,4"/>
+      <Button Content="Gray"   Tag="Gray"   Click="OnColorClicked" Margin="0,0,4,4"/>
+    </WrapPanel>
+
+    <Separator/>
+
+    <TextBlock Text="Width" FontWeight="Bold"/>
+    <Grid ColumnDefinitions="*,40">
+      <Slider x:Name="WidthSlider" Minimum="1" Maximum="20"
+              ValueChanged="OnWidthChanged"/>
+      <TextBlock x:Name="WidthLabel" Grid.Column="1"
+                 VerticalAlignment="Center" HorizontalAlignment="Right"/>
+    </Grid>
+
+    <Separator/>
+
+    <TextBlock Text="Point radius" FontWeight="Bold"/>
+    <Grid ColumnDefinitions="*,40">
+      <Slider x:Name="RadiusSlider" Minimum="1" Maximum="20"
+              ValueChanged="OnRadiusChanged"/>
+      <TextBlock x:Name="RadiusLabel" Grid.Column="1"
+                 VerticalAlignment="Center" HorizontalAlignment="Right"/>
+    </Grid>
+  </StackPanel>
+</Window>

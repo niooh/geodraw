@@ -69,6 +69,13 @@ public partial class MainWindow : Window
             vm.SetViewCommand.Execute(name);
     }
 
+    private async void OnStyleClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var w = new StyleWindow { DataContext = vm };
+        await w.ShowDialog(this);
+    }
+	
     private void OnOperateMenuClicked(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;
@@ -76,7 +83,20 @@ public partial class MainWindow : Window
 
         switch (name)
         {
-            case "Rotate":
+            case "ConnectOneCurve":
+                vm.ConnectOneCurveCommand.Execute(null);
+                break;
+            case "ConnectM":
+                vm.ConnectMCommand.Execute(null);
+                break;
+            case "ConnectQ":
+                vm.ConnectQCommand.Execute(null);
+                break;
+            case "ConnectC":
+                vm.ConnectCCommand.Execute(null);
+                break;
+
+			case "Rotate":
                 OnRotateClicked(sender, e);
                 break;
             case "ReflectPoint":
@@ -88,7 +108,13 @@ public partial class MainWindow : Window
             case "Duplicate":
                 vm.DuplicateCommand.Execute(null);
                 break;
-            case "Delete":
+            case "SelectNext":
+                vm.SelectNextCommand.Execute(null);
+                break;
+            case "SelectPrev":
+                vm.SelectPrevCommand.Execute(null);
+                break;
+			case "Delete":
                 vm.DeleteSelectedCommand.Execute(null);
                 break;
             case "Clear":

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,6 +13,7 @@ using GeoDraw.Controls;
 using GeoDraw.Geometry;
 using GeoDraw.Models;
 using GeoDraw.Services;
+using PathSegment = GeoDraw.Models.PathSegment;
 
 namespace GeoDraw.ViewModels;
 
@@ -403,6 +405,225 @@ public partial class MainViewModel : ObservableObject
         return (new Point(r.X + r.Width / 2, r.Y + r.Height / 2), null);
     }
 
+    public void LogExternal(string line) => Log(line);
+
+    // 选中导航
+    [RelayCommand]
+    private void SelectNext()
+    {
+        var objects = Document.Objects;
+        if (objects.Count == 0) return;
+
+        if (SelectedObjects.Count == 0)
+        {
+            SelectedObjects.Add(objects[0]);
+        }
+        else
+        {
+            var cur = SelectedObjects[^1];
+            var idx = objects.IndexOf(cur);
+            var next = objects[(idx + 1) % objects.Count];
+            SelectedObjects.Clear();
+            SelectedObjects.Add(next);
+        }
+        Log("next object");
+    }
+
+    [RelayCommand]
+    private void SelectPrev()
+    {
+        var objects = Document.Objects;
+        if (objects.Count == 0) return;
+
+        if (SelectedObjects.Count == 0)
+        {
+            SelectedObjects.Add(objects[^1]);
+        }
+        else
+        {
+            var cur = SelectedObjects[^1];
+            var idx = objects.IndexOf(cur);
+            var n = objects.Count;
+            var prev = objects[(idx - 1 + n) % n];
+            SelectedObjects.Clear();
+            SelectedObjects.Add(prev);
+        }
+        Log("prev object");
+    }
+
+    // Connect 系列
+    private List<DrawObject> GetSelectedPoints() =>
+        SelectedObjects.Where(o => o.Type == DrawObjectType.Point).ToList();
+
+    private void ReplaceSelectionWithSingle(DrawObject obj)
+    {
+        Document.Objects.Add(obj);
+        SelectedObjects.Clear();
+        SelectedObjects.Add(obj);
+    }
+
+    [RelayCommand]
+    private void ConnectOneCurve()
+    {
+        var points = GetSelectedPoints();
+        if (points.Count < 2)
+        {
+            Log("need at least 2 points");
+            return;
+        }
+
+        PathData pd;
+        string desc;
+        switch (points.Count)
+        {
+            case 2:
+            {
+                pd = new PathData();
+                pd.Segments.Add(new PathSegment { Command = PathCommand.MoveTo, Points = [points[0].Geo] });
+                pd.Segments.Add(new PathSegment { Command = PathCommand.LineTo, Points = [points[1].Geo] });
+                desc = "line";
+                break;
+            }
+            case 3:
+            {
+                pd = new PathData();
+                pd.Segments.Add(new PathSegment { Command = PathCommand.MoveTo, Points = [points[0].Geo] });
+                pd.Segments.Add(new PathSegment { Command = PathCommand.QuadTo, Points = [points[1].Geo, points[2].Geo] });
+                desc = "quadratic bezier";
+                break;
+            }
+            case 4:
+            {
+                pd = new PathData();
+                pd.Segments.Add(new PathSegment { Command = PathCommand.MoveTo, Points = [points[0].Geo] });
+                pd.Segments.Add(new PathSegment { Command = PathCommand.CubicTo, Points = [points[1].Geo, points[2].Geo, points[3].Geo] });
+                desc = "cubic bezier";
+                break;
+            }
+            default:
+                Log("connect: 2-4 points only");
+                return;
+        }
+
+        var line = new DrawObject
+        {
+            Id = Document.NextId(DrawObjectType.Path),
+            Type = DrawObjectType.Path,
+            Path = pd,
+            Style = CurrentStyle.Clone()
+        };
+        ReplaceSelectionWithSingle(line);
+        Log($"connect: {line.Id} ({desc})");
+    }
+
+    [RelayCommand]
+    private void ConnectM()
+    {
+        var points = GetSelectedPoints();
+        if (points.Count < 2)
+        {
+            Log("need at least 2 points");
+            return;
+        }
+
+        var pd = new PathData();
+        pd.Segments.Add(new PathSegment { Command = PathCommand.MoveTo, Points = [points[0].Geo] });
+        foreach (var p in points.Skip(1))
+            pd.Segments.Add(new PathSegment { Command = PathCommand.LineTo, Points = [p.Geo] });
+
+        var line = new DrawObject
+        {
+            Id = Document.NextId(DrawObjectType.Path),
+            Type = DrawObjectType.Path,
+            Path = pd,
+            Style = CurrentStyle.Clone()
+        };
+        ReplaceSelectionWithSingle(line);
+        Log($"connect(M): {line.Id}, {points.Count} vertices");
+    }
+
+    [RelayCommand]
+    private void ConnectQ()
+    {
+        var points = GetSelectedPoints();
+        if (points.Count < 3)
+        {
+            Log("need at least 3 points");
+            return;
+        }
+
+        var pd = new PathData();
+        pd.Segments.Add(new PathSegment { Command = PathCommand.MoveTo, Points = [points[0].Geo] });
+
+        var n = 0;
+        for (var i = 0; i + 2 < points.Count; i += 2)
+        {
+            pd.Segments.Add(new PathSegment
+            {
+                Command = PathCommand.QuadTo,
+                Points = [points[i + 1].Geo, points[i + 2].Geo]
+            });
+            n++;
+        }
+
+        if (n == 0)
+        {
+            Log("not enough points to form a curve");
+            return;
+        }
+
+        var line = new DrawObject
+        {
+            Id = Document.NextId(DrawObjectType.Path),
+            Type = DrawObjectType.Path,
+            Path = pd,
+            Style = CurrentStyle.Clone()
+        };
+        ReplaceSelectionWithSingle(line);
+        Log($"connect(Q): {line.Id}, {n} quadratic segments");
+    }
+
+    [RelayCommand]
+    private void ConnectC()
+    {
+        var points = GetSelectedPoints();
+        if (points.Count < 4)
+        {
+            Log("need at least 4 points");
+            return;
+        }
+
+        var pd = new PathData();
+        pd.Segments.Add(new PathSegment { Command = PathCommand.MoveTo, Points = [points[0].Geo] });
+
+        var n = 0;
+        for (var i = 0; i + 3 < points.Count; i += 3)
+        {
+            pd.Segments.Add(new PathSegment
+            {
+                Command = PathCommand.CubicTo,
+                Points = [points[i + 1].Geo, points[i + 2].Geo, points[i + 3].Geo]
+            });
+            n++;
+        }
+
+        if (n == 0)
+        {
+            Log("not enough points to form a curve");
+            return;
+        }
+
+        var line = new DrawObject
+        {
+            Id = Document.NextId(DrawObjectType.Path),
+            Type = DrawObjectType.Path,
+            Path = pd,
+            Style = CurrentStyle.Clone()
+        };
+        ReplaceSelectionWithSingle(line);
+        Log($"connect(C): {line.Id}, {n} cubic segments");
+    }
+	
     // CLI
     [RelayCommand]
     private void RunCli()
