@@ -17,6 +17,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // 隧道阶段捕获 Ctrl+方向键，先于子控件和键盘导航
+        AddHandler(KeyDownEvent, OnGlobalKeyDown, RoutingStrategies.Tunnel);
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -47,6 +49,25 @@ public partial class MainWindow : Window
                 break;
         }
     }
+
+	private void OnGlobalKeyDown(object? sender, KeyEventArgs e)
+	{
+		if (DataContext is not MainViewModel vm) return;
+
+		if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)
+			|| e.Key is not (Key.Right or Key.Left))
+			return;
+
+		// 焦点在文本框里时放行
+		if (e.Source is TextBox) return;
+
+		if (e.Key == Key.Right)
+			vm.SelectNextCommand.Execute(null);
+		else
+			vm.SelectPrevCommand.Execute(null);
+
+		e.Handled = true;
+	}
 
     private void OnCliKeyDown(object? sender, KeyEventArgs e)
     {

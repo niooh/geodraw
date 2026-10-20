@@ -169,13 +169,13 @@ public partial class MainViewModel : ObservableObject
                 SelX = o.Geo.X;
                 SelY = o.Geo.Y;
                 SelRadius = o.Style.Radius;
-                SelectedSummary = $"{o.Id} · point  ({o.Geo.X:0.#}, {o.Geo.Y:0.#})";
+                SelectedSummary = $"{o.Id} · point";
             }
             else
             {
                 SelWidth = o.Style.Width;
                 SelSegmentCount = o.Path?.Segments.Count ?? 0;
-                SelectedSummary = $"{o.Id} · path   ({SelSegmentCount} segments)";
+                SelectedSummary = $"{o.Id} · path";
             }
         }
         finally
@@ -426,7 +426,6 @@ public partial class MainViewModel : ObservableObject
             SelectedObjects.Clear();
             SelectedObjects.Add(next);
         }
-        Log("next object");
     }
 
     [RelayCommand]
@@ -448,7 +447,6 @@ public partial class MainViewModel : ObservableObject
             SelectedObjects.Clear();
             SelectedObjects.Add(prev);
         }
-        Log("prev object");
     }
 
     // Connect 系列
