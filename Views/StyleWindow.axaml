@@ -4,10 +4,10 @@
         x:Class="GeoDraw.Views.StyleWindow"
         x:DataType="vm:MainViewModel"
         Title="Style (applies to new objects)"
-        Width="340" Height="360"
+        Width="340" Height="260"
         WindowStartupLocation="CenterOwner">
 
-  <StackPanel Margin="16" Spacing="10">
+  <StackPanel Margin="16" Spacing="12">
     <TextBlock Text="Stroke color" FontWeight="Bold"/>
     <WrapPanel ItemWidth="80" ItemHeight="32">
       <Button Content="Black"  Tag="Black"  Click="OnColorClicked" Margin="0,0,4,4"/>
@@ -19,24 +19,12 @@
       <Button Content="Gray"   Tag="Gray"   Click="OnColorClicked" Margin="0,0,4,4"/>
     </WrapPanel>
 
-    <Separator/>
+    <TextBlock Text="Width (1-20)" FontWeight="Bold"/>
+    <TextBox x:Name="WidthTextBox" TextInput="OnNumberTextInput"
+             TextChanged="OnWidthTextChanged" LostFocus="OnWidthLostFocus"/>
 
-    <TextBlock Text="Width" FontWeight="Bold"/>
-    <Grid ColumnDefinitions="*,40">
-      <Slider x:Name="WidthSlider" Minimum="1" Maximum="20"
-              ValueChanged="OnWidthChanged"/>
-      <TextBlock x:Name="WidthLabel" Grid.Column="1"
-                 VerticalAlignment="Center" HorizontalAlignment="Right"/>
-    </Grid>
-
-    <Separator/>
-
-    <TextBlock Text="Point radius" FontWeight="Bold"/>
-    <Grid ColumnDefinitions="*,40">
-      <Slider x:Name="RadiusSlider" Minimum="1" Maximum="20"
-              ValueChanged="OnRadiusChanged"/>
-      <TextBlock x:Name="RadiusLabel" Grid.Column="1"
-                 VerticalAlignment="Center" HorizontalAlignment="Right"/>
-    </Grid>
+    <TextBlock Text="Point radius (1-20)" FontWeight="Bold"/>
+    <TextBox x:Name="RadiusTextBox" TextInput="OnNumberTextInput"
+             TextChanged="OnRadiusTextChanged" LostFocus="OnRadiusLostFocus"/>
   </StackPanel>
 </Window>

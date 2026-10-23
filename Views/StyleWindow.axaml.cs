@@ -1,6 +1,6 @@
 using System;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using GeoDraw.ViewModels;
@@ -19,10 +19,8 @@ public partial class StyleWindow : Window
         base.OnOpened(e);
         if (DataContext is MainViewModel vm)
         {
-            WidthSlider.Value = vm.CurrentStyle.Width;
-            RadiusSlider.Value = vm.CurrentStyle.Radius;
-            WidthLabel.Text = $"{vm.CurrentStyle.Width:0}";
-            RadiusLabel.Text = $"{vm.CurrentStyle.Radius:0}";
+            WidthTextBox.Text = vm.CurrentStyle.Width.ToString("0");
+            RadiusTextBox.Text = vm.CurrentStyle.Radius.ToString("0");
         }
     }
 
@@ -45,21 +43,56 @@ public partial class StyleWindow : Window
         vm.LogExternal($"style: color={name}");
     }
 
-    private void OnWidthChanged(object? sender, RangeBaseValueChangedEventArgs e)
+    private void OnNumberTextInput(object? sender, TextInputEventArgs e)
     {
-        if (DataContext is MainViewModel vm)
+        if (e.Text is null) return;
+        foreach (var c in e.Text)
         {
-            vm.CurrentStyle.Width = e.NewValue;
-            WidthLabel.Text = $"{e.NewValue:0}";
+            if (!char.IsDigit(c))
+            {
+                e.Handled = true;
+                return;
+            }
         }
     }
 
-    private void OnRadiusChanged(object? sender, RangeBaseValueChangedEventArgs e)
+    private void OnWidthTextChanged(object? sender, TextChangedEventArgs e)
     {
-        if (DataContext is MainViewModel vm)
+        if (DataContext is not MainViewModel vm) return;
+        if (double.TryParse(WidthTextBox.Text, out var val))
         {
-            vm.CurrentStyle.Radius = e.NewValue;
-            RadiusLabel.Text = $"{e.NewValue:0}";
+            val = Math.Clamp(val, 1, 20);
+            vm.CurrentStyle.Width = val;
         }
+    }
+
+    private void OnWidthLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (!double.TryParse(WidthTextBox.Text, out var val))
+            val = vm.CurrentStyle.Width;
+        val = Math.Clamp(val, 1, 20);
+        vm.CurrentStyle.Width = val;
+        WidthTextBox.Text = val.ToString("0");
+    }
+
+    private void OnRadiusTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (double.TryParse(RadiusTextBox.Text, out var val))
+        {
+            val = Math.Clamp(val, 1, 20);
+            vm.CurrentStyle.Radius = val;
+        }
+    }
+
+    private void OnRadiusLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (!double.TryParse(RadiusTextBox.Text, out var val))
+            val = vm.CurrentStyle.Radius;
+        val = Math.Clamp(val, 1, 20);
+        vm.CurrentStyle.Radius = val;
+        RadiusTextBox.Text = val.ToString("0");
     }
 }

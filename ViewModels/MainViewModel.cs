@@ -76,14 +76,13 @@ public partial class MainViewModel : ObservableObject
     }
 
     [ObservableProperty] private double _rotateAngle = 90;
-    [ObservableProperty] private double _rotateCount = 1;
+    [ObservableProperty] private int _rotateCount = 1;
 
     public MainViewModel()
     {
         SelectedObjects.CollectionChanged += (_, _) => UpdateSelectionSummary();
     }
 
-    // 属性回写
     partial void OnSelXChanged(double value)
     {
         if (_syncingSelection) return;
@@ -352,7 +351,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         var sign = RotateClockwise ? 1.0 : -1.0;
-        var count = Math.Max(1, (int)Math.Round(RotateCount));
+        var count = Math.Max(1, RotateCount);
         var created = new System.Collections.Generic.List<DrawObject>();
 
         for (var i = 1; i <= count; i++)

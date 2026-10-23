@@ -1,12 +1,14 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using GeoDraw.ViewModels;
 using GeoDraw.Services;
 
@@ -21,15 +23,26 @@ public partial class MainWindow : Window
         AddHandler(KeyDownEvent, OnGlobalKeyDown, RoutingStrategies.Tunnel);
     }
 
-    protected override void OnDataContextChanged(EventArgs e)
-    {
-        base.OnDataContextChanged(e);
-        if (DataContext is MainViewModel vm)
-        {
-            vm.Canvas = DrawCanvas;
-            DrawCanvas.Highlighter = vm.Highlighter;
-        }
-    }
+	protected override void OnDataContextChanged(EventArgs e)
+	{
+		base.OnDataContextChanged(e);
+		if (DataContext is MainViewModel vm)
+		{
+			vm.Canvas = DrawCanvas;
+			DrawCanvas.Highlighter = vm.Highlighter;
+
+			vm.PropertyChanged -= OnViewModelPropertyChanged;
+			vm.PropertyChanged += OnViewModelPropertyChanged;
+		}
+	}
+
+	private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+	{
+		if (e.PropertyName == nameof(MainViewModel.LogText))
+		{
+			Dispatcher.UIThread.Post(() => LogScrollViewer.ScrollToEnd());
+		}
+	}
 
     protected override void OnKeyDown(KeyEventArgs e)
     {

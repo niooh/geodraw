@@ -136,8 +136,10 @@
             <Separator Margin="0,6"/>
 
             <TextBlock Text="Log" FontWeight="Bold" FontSize="14"/>
-            <TextBlock Text="{Binding LogText}"
-                       FontSize="13" TextWrapping="Wrap" Foreground="#444"/>
+			<ScrollViewer x:Name="LogScrollViewer" Height="150" VerticalScrollBarVisibility="Auto">
+			  <TextBlock Text="{Binding LogText}"
+                           FontSize="14" TextWrapping="Wrap" Foreground="#444"/>
+			</ScrollViewer>
           </StackPanel>
         </ScrollViewer>
       </DockPanel>
