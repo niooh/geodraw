@@ -97,51 +97,65 @@
         <TextBlock DockPanel.Dock="Top" Text="Info"
                    FontWeight="Bold" FontSize="16"
                    HorizontalAlignment="Center" Margin="0,0,0,10"/>
-        <ScrollViewer>
-          <StackPanel Spacing="6">
-            <TextBlock Text="{Binding ToolLabel}" FontSize="14"/>
-            <TextBlock Text="{Binding ViewLabel}" FontSize="14"/>
 
-            <Separator Margin="0,6"/>
+        <StackPanel DockPanel.Dock="Top" Spacing="6">
+          <TextBlock Text="{Binding ToolLabel}" FontSize="14"/>
+          <TextBlock Text="{Binding ViewLabel}" FontSize="14"/>
 
-            <TextBlock Text="Selection" FontWeight="Bold" FontSize="14"/>
-            <TextBlock Text="{Binding SelectedSummary}"
-                       FontSize="14" TextWrapping="Wrap"/>
+          <Separator Margin="0,6"/>
 
-            <StackPanel Spacing="4" IsVisible="{Binding HasSingleSelection}">
-              <TextBlock Text="{Binding SelId}" FontWeight="Bold" FontSize="14"/>
+          <TextBlock Text="{Binding SelectedSummary}"
+                     FontSize="14" TextWrapping="Wrap"/>
 
-              <StackPanel Spacing="4" IsVisible="{Binding IsPointSelected}">
-                <Grid ColumnDefinitions="40,*">
-                  <TextBlock Text="X" VerticalAlignment="Center"/>
-                  <TextBox Grid.Column="1" Text="{Binding SelX, Mode=TwoWay}"/>
-                </Grid>
-                <Grid ColumnDefinitions="40,*">
-                  <TextBlock Text="Y" VerticalAlignment="Center"/>
-                  <TextBox Grid.Column="1" Text="{Binding SelY, Mode=TwoWay}"/>
-                </Grid>
-                <TextBlock Text="Radius"/>
-                <Slider Minimum="1" Maximum="30"
-                        Value="{Binding SelRadius, Mode=TwoWay}"/>
-              </StackPanel>
-
-              <StackPanel Spacing="4" IsVisible="{Binding IsPathSelected}">
-                <TextBlock Text="{Binding SelSegmentCount, StringFormat='Segments: {0}'}"/>
-                <TextBlock Text="Width"/>
-                <Slider Minimum="1" Maximum="20"
-                        Value="{Binding SelWidth, Mode=TwoWay}"/>
-              </StackPanel>
+          <StackPanel Spacing="6" IsVisible="{Binding HasSingleSelection}">
+            <StackPanel Spacing="4" IsVisible="{Binding IsPointSelected}">
+              <Grid ColumnDefinitions="80,*">
+                <TextBlock Text="X" VerticalAlignment="Center" FontSize="14"/>
+                <TextBox x:Name="SelXBox" Grid.Column="1"
+                         Text="{Binding SelX, Mode=TwoWay}"
+                         LostFocus="OnNumberLostFocus"/>
+              </Grid>
+              <Grid ColumnDefinitions="80,*">
+                <TextBlock Text="Y" VerticalAlignment="Center" FontSize="14"/>
+                <TextBox x:Name="SelYBox" Grid.Column="1"
+                         Text="{Binding SelY, Mode=TwoWay}"
+                         LostFocus="OnNumberLostFocus"/>
+              </Grid>
+              <Grid ColumnDefinitions="80,*">
+                <TextBlock Text="Radius" VerticalAlignment="Center" FontSize="14"/>
+                <TextBox x:Name="SelRadiusBox" Grid.Column="1"
+                         Text="{Binding SelRadius, Mode=TwoWay}"
+                         LostFocus="OnNumberLostFocus"/>
+              </Grid>
             </StackPanel>
 
-            <Separator Margin="0,6"/>
-
-            <TextBlock Text="Log" FontWeight="Bold" FontSize="14"/>
-			<ScrollViewer x:Name="LogScrollViewer" Height="150" VerticalScrollBarVisibility="Auto">
-			  <TextBlock Text="{Binding LogText}"
-                           FontSize="14" TextWrapping="Wrap" Foreground="#444"/>
-			</ScrollViewer>
+            <StackPanel Spacing="4" IsVisible="{Binding IsPathSelected}">
+              <Grid ColumnDefinitions="80,*">
+                <TextBlock Text="Segments" VerticalAlignment="Center" FontSize="14"/>
+                <TextBlock Grid.Column="1" Text="{Binding SelSegmentCount}"
+                           FontSize="14" VerticalAlignment="Center"/>
+              </Grid>
+              <Grid ColumnDefinitions="80,*">
+                <TextBlock Text="Width" VerticalAlignment="Center" FontSize="14"/>
+                <TextBox x:Name="SelWidthBox" Grid.Column="1"
+                         Text="{Binding SelWidth, Mode=TwoWay}"
+                         LostFocus="OnNumberLostFocus"/>
+              </Grid>
+            </StackPanel>
           </StackPanel>
-        </ScrollViewer>
+
+          <Separator Margin="0,6"/>
+        </StackPanel>
+
+        <!-- Log 占据剩余高度 -->
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Text="Log"
+                     FontWeight="Bold" FontSize="14" Margin="0,0,0,4"/>
+          <ScrollViewer x:Name="LogScrollViewer" VerticalScrollBarVisibility="Auto">
+            <TextBlock Text="{Binding LogText}"
+                       FontSize="14" TextWrapping="Wrap" Foreground="#444"/>
+          </ScrollViewer>
+        </DockPanel>
       </DockPanel>
     </Border>
 

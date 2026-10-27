@@ -326,6 +326,8 @@ public sealed class DrawingCanvas : Control
                 Style = CurrentStyle.Clone()
             };
             Document.Objects.Add(obj);
+            SelectedObjects?.Clear();
+            SelectedObjects?.Add(obj);
             _pointerDown = false;
         }
 
@@ -446,5 +448,7 @@ public sealed class DrawingCanvas : Control
             Style = CurrentStyle.Clone()
         };
         Document.Objects.Add(obj);
+        SelectedObjects?.Clear();
+        SelectedObjects?.Add(obj);
     }
 }

@@ -90,6 +90,20 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void OnNumberLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not TextBox tb || DataContext is not MainViewModel vm) return;
+
+        tb.Text = tb.Name switch
+        {
+            "SelXBox"      => vm.SelX.ToString("0.##"),
+            "SelYBox"      => vm.SelY.ToString("0.##"),
+            "SelRadiusBox" => vm.SelRadius.ToString("0.#"),
+            "SelWidthBox"  => vm.SelWidth.ToString("0.#"),
+            _              => tb.Text
+        };
+    }
+
     // 菜单项
     private void OnToolMenuClicked(object? sender, RoutedEventArgs e)
     {
@@ -129,7 +143,6 @@ public partial class MainWindow : Window
             case "ConnectC":
                 vm.ConnectCCommand.Execute(null);
                 break;
-
 			case "Rotate":
                 OnRotateClicked(sender, e);
                 break;

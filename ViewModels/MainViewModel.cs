@@ -182,7 +182,7 @@ public partial class MainViewModel : ObservableObject
             _syncingSelection = false;
         }
     }
-
+	
     // 命令
     [RelayCommand]
     private void SetTool(string? name)
