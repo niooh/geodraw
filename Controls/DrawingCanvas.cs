@@ -145,6 +145,9 @@ public sealed class DrawingCanvas : Control
             DrawIdLabels(context, doc);
     }
 
+	private static Point RoundPoint(Point p) =>
+		new(Math.Round(p.X, 2), Math.Round(p.Y, 2));
+
     private void DrawObject(DrawingContext context, DrawObject obj)
     {
         var selected = SelectedObjects?.Contains(obj) == true;
@@ -314,7 +317,7 @@ public sealed class DrawingCanvas : Control
 
         _pointerDown = true;
         _dragStarted = false;
-        _pressPoint = e.GetPosition(this);
+		_pressPoint = RoundPoint(e.GetPosition(this));
 
         if (Tool == EditorTool.Point && Document != null)
         {
@@ -339,7 +342,7 @@ public sealed class DrawingCanvas : Control
         base.OnPointerMoved(e);
         if (!_pointerDown) return;
 
-        var pt = e.GetPosition(this);
+        var pt = RoundPoint(e.GetPosition(this));
 
         if (!_dragStarted)
         {
