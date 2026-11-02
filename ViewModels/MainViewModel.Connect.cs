@@ -61,7 +61,8 @@ public partial class MainViewModel
                 Log("connect: 2-4 points only");
                 return;
         }
-
+		
+		PushUndo();
         var line = new DrawObject
         {
             Id = Document.NextId(DrawObjectType.Path),
@@ -88,6 +89,7 @@ public partial class MainViewModel
         foreach (var p in points.Skip(1))
             pd.Segments.Add(new PathSegment { Command = PathCommand.LineTo, Points = [p.Geo] });
 
+		PushUndo();
         var line = new DrawObject
         {
             Id = Document.NextId(DrawObjectType.Path),
@@ -129,6 +131,7 @@ public partial class MainViewModel
             return;
         }
 
+		PushUndo();
         var line = new DrawObject
         {
             Id = Document.NextId(DrawObjectType.Path),
@@ -170,6 +173,7 @@ public partial class MainViewModel
             return;
         }
 
+		PushUndo();
         var line = new DrawObject
         {
             Id = Document.NextId(DrawObjectType.Path),

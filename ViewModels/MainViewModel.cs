@@ -18,7 +18,21 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<DrawObject> SelectedObjects { get; } = new();
     public Highlighter Highlighter { get; } = new();
 
-    public DrawingCanvas? Canvas { get; set; }
+    private readonly UndoStack _undoStack = new();
+
+    // Canvas 走 backing field，以便订阅 BeforeDocumentEdit
+    private DrawingCanvas? _canvas;
+    public DrawingCanvas? Canvas
+    {
+        get => _canvas;
+        set
+        {
+            if (_canvas == value) return;
+            if (_canvas != null) _canvas.BeforeDocumentEdit -= OnCanvasBeforeEdit;
+            _canvas = value;
+            if (_canvas != null) _canvas.BeforeDocumentEdit += OnCanvasBeforeEdit;
+        }
+    }
 
     [ObservableProperty]
     private EditorTool _tool = EditorTool.Select;
@@ -62,12 +76,55 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    // 撤销
+    private void OnCanvasBeforeEdit() => PushUndo();
+
+    public bool CanUndo => _undoStack.CanUndo;
+    public bool CanRedo => _undoStack.CanRedo;
+
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    private void Undo()
+    {
+        var current = DocumentSnapshot.Capture(Document);
+        var target = _undoStack.Undo(current);
+        if (target == null) return;
+        RestoreSnapshot(target);
+        Log("undo");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRedo))]
+    private void Redo()
+    {
+        var current = DocumentSnapshot.Capture(Document);
+        var target = _undoStack.Redo(current);
+        if (target == null) return;
+        RestoreSnapshot(target);
+        Log("redo");
+    }
+
+    private void PushUndo()
+    {
+        _undoStack.Push(DocumentSnapshot.Capture(Document));
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RestoreSnapshot(DocumentSnapshot snapshot)
+    {
+        snapshot.RestoreTo(Document);
+        SelectedObjects.Clear();
+        Canvas?.InvalidateVisual();
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
+    }
+
     // 删除
     [RelayCommand]
     private void DeleteSelected()
     {
         if (SelectedObjects.Count == 0) return;
 
+        PushUndo();
         var ids = SelectedObjects.Select(o => o.Id).ToList();
         foreach (var o in ids.Select(Document.Find).Where(o => o != null).ToList())
             Document.Objects.Remove(o!);
@@ -79,6 +136,9 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ClearAll()
     {
+        if (Document.Objects.Count == 0) return;
+
+        PushUndo();
         Document.Objects.Clear();
         SelectedObjects.Clear();
         Log("cleared");
@@ -155,7 +215,7 @@ public partial class MainViewModel : ObservableObject
     public string BuildSvg(int width, int height) =>
         SvgExporter.Build(Document, width, height);
 
-    /// <summary>用新文档替换当前文档，重置选择和状态。</summary>
+    /// <summary>用新文档替换当前文档，清空撤销历史。</summary>
     public void LoadDocument(Document newDoc)
     {
         Document.Objects.Clear();
@@ -165,6 +225,11 @@ public partial class MainViewModel : ObservableObject
         Document.PCounter = newDoc.PCounter;
         Document.LCounter = newDoc.LCounter;
         SelectedObjects.Clear();
+
+        _undoStack.Clear();
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
+
         Log($"imported {Document.Objects.Count} object(s)");
     }
 

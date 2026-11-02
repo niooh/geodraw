@@ -22,45 +22,49 @@ public partial class MainViewModel
     [ObservableProperty] private int _selSegmentCount;
     [ObservableProperty] private string _selectedSummary = "none";
 
-    partial void OnSelXChanged(double value)
-    {
-        if (_syncingSelection) return;
-        if (SingleSelectedPoint() is { } p)
-        {
-            p.Geo = new Point(value, p.Geo.Y);
-            Canvas?.InvalidateVisual();
-        }
-    }
+	partial void OnSelXChanged(double value)
+	{
+		if (_syncingSelection) return;
+		if (SingleSelectedPoint() is { } p)
+		{
+			p.Geo = new Point(value, p.Geo.Y);
+			p.InvalidateRenderCache();
+			Canvas?.InvalidateVisual();
+		}
+	}
 
-    partial void OnSelYChanged(double value)
-    {
-        if (_syncingSelection) return;
-        if (SingleSelectedPoint() is { } p)
-        {
-            p.Geo = new Point(p.Geo.X, value);
-            Canvas?.InvalidateVisual();
-        }
-    }
+	partial void OnSelYChanged(double value)
+	{
+		if (_syncingSelection) return;
+		if (SingleSelectedPoint() is { } p)
+		{
+			p.Geo = new Point(p.Geo.X, value);
+			p.InvalidateRenderCache();
+			Canvas?.InvalidateVisual();
+		}
+	}
 
-    partial void OnSelRadiusChanged(double value)
-    {
-        if (_syncingSelection) return;
-        if (SingleSelectedPoint() is { } p)
-        {
-            p.Style.Radius = value;
-            Canvas?.InvalidateVisual();
-        }
-    }
+	partial void OnSelRadiusChanged(double value)
+	{
+		if (_syncingSelection) return;
+		if (SingleSelectedPoint() is { } p)
+		{
+			p.Style.Radius = value;
+			p.InvalidateRenderCache();
+			Canvas?.InvalidateVisual();
+		}
+	}
 
-    partial void OnSelWidthChanged(double value)
-    {
-        if (_syncingSelection) return;
-        if (SingleSelectedPath() is { } p)
-        {
-            p.Style.Width = value;
-            Canvas?.InvalidateVisual();
-        }
-    }
+	partial void OnSelWidthChanged(double value)
+	{
+		if (_syncingSelection) return;
+		if (SingleSelectedPath() is { } p)
+		{
+			p.Style.Width = value;
+			p.InvalidateRenderCache();
+			Canvas?.InvalidateVisual();
+		}
+	}
 
     private DrawObject? SingleSelectedPoint() =>
         SelectedObjects.Count == 1 && SelectedObjects[0].Type == DrawObjectType.Point

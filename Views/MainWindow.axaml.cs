@@ -67,19 +67,38 @@ public partial class MainWindow : Window
 	{
 		if (DataContext is not MainViewModel vm) return;
 
-		if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)
-			|| e.Key is not (Key.Right or Key.Left))
+		// 焦点在文本框里时放行给文本框自身的编辑（含 TextBox 内置 Undo）
+		var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+		if (focused is TextBox) return;
+
+		if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return;
+
+		if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && e.Key == Key.Z)
+		{
+			vm.RedoCommand.Execute(null);
+			e.Handled = true;
 			return;
+		}
 
-		// 焦点在文本框里时放行
-		if (e.Source is TextBox) return;
-
-		if (e.Key == Key.Right)
-			vm.SelectNextCommand.Execute(null);
-		else
-			vm.SelectPrevCommand.Execute(null);
-
-		e.Handled = true;
+		switch (e.Key)
+		{
+			case Key.Right:
+				vm.SelectNextCommand.Execute(null);
+				e.Handled = true;
+				break;
+			case Key.Left:
+				vm.SelectPrevCommand.Execute(null);
+				e.Handled = true;
+				break;
+			case Key.Z:
+				vm.UndoCommand.Execute(null);
+				e.Handled = true;
+				break;
+			case Key.Y:
+				vm.RedoCommand.Execute(null);
+				e.Handled = true;
+				break;
+		}
 	}
 
     private void OnCliKeyDown(object? sender, KeyEventArgs e)

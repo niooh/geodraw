@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Globalization;
@@ -64,6 +65,9 @@ public sealed class DrawingCanvas : Control
     /// <summary>由 MainWindow 注入；Render 时读取，不参与属性通知。</summary>
     public Highlighter? Highlighter { get; set; }
 
+    /// <summary>文档即将被编辑前触发，供 Undo 栈抓取快照。</summary>
+    public event Action? BeforeDocumentEdit;
+
     private bool _pointerDown;
     private Point _pressPoint;
     private bool _dragStarted;
@@ -71,6 +75,9 @@ public sealed class DrawingCanvas : Control
     private Point _marqueeStart, _marqueeEnd;
     private bool _dragging;
     private Point _dragStart, _dragEnd;
+
+    private readonly Dictionary<(Color color, double width), Pen> _penCache = new();
+    private readonly Dictionary<Color, IBrush> _brushCache = new();
 
     public DrawingCanvas()
     {
@@ -109,6 +116,27 @@ public sealed class DrawingCanvas : Control
     private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         InvalidateVisual();
 
+    private IBrush GetBrush(Color color)
+    {
+        if (!_brushCache.TryGetValue(color, out var b))
+        {
+            b = new SolidColorBrush(color);
+            _brushCache[color] = b;
+        }
+        return b;
+    }
+
+    private Pen GetPen(Color color, double width)
+    {
+        var key = (color, width);
+        if (!_penCache.TryGetValue(key, out var p))
+        {
+            p = new Pen(GetBrush(color), width);
+            _penCache[key] = p;
+        }
+        return p;
+    }
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -118,68 +146,63 @@ public sealed class DrawingCanvas : Control
         var doc = Document;
         if (doc != null)
         {
+            var hl = Highlighter?.Snapshot();
             foreach (var obj in doc.Objects)
-                DrawObject(context, obj);
+                DrawObject(context, obj, hl);
         }
 
         if (_dragging)
         {
             var preview = BuildPreviewPath();
             if (preview != null)
-            {
-                var pen = new Pen(new SolidColorBrush(Color.FromRgb(140, 140, 140)), 1);
-                context.DrawGeometry(null, pen, preview);
-            }
+                context.DrawGeometry(null, GetPen(Color.FromRgb(140, 140, 140), 1), preview);
         }
 
         if (_marquee)
         {
             var r = GeometryHelper.NormalizeRect(_marqueeStart, _marqueeEnd);
-            context.FillRectangle(
-                new SolidColorBrush(Color.FromArgb(40, 0, 120, 215)), r);
-            context.DrawRectangle(
-                new Pen(new SolidColorBrush(Color.FromRgb(0, 120, 215)), 1), r);
+            context.FillRectangle(GetBrush(Color.FromArgb(40, 0, 120, 215)), r);
+            context.DrawRectangle(GetPen(Color.FromRgb(0, 120, 215), 1), r);
         }
 
         if (doc != null && ViewMode != IdViewMode.None)
             DrawIdLabels(context, doc);
     }
 
-	private static Point RoundPoint(Point p) =>
-		new(Math.Round(p.X, 2), Math.Round(p.Y, 2));
+    private static Point RoundPoint(Point p) =>
+        new(Math.Round(p.X, 2), Math.Round(p.Y, 2));
 
-    private void DrawObject(DrawingContext context, DrawObject obj)
+    private void DrawObject(
+        DrawingContext context,
+        DrawObject obj,
+        IReadOnlyDictionary<string, Color>? hl)
     {
         var selected = SelectedObjects?.Contains(obj) == true;
-        var stroke = Highlighter?.Get(obj.Id) ?? obj.Style.StrokeColor;
+        var stroke = hl != null && hl.TryGetValue(obj.Id, out var hc)
+            ? hc
+            : obj.Style.StrokeColor;
 
         switch (obj.Type)
         {
             case DrawObjectType.Point:
             {
                 if (selected)
-                {
-                    var hl = new SolidColorBrush(Color.FromRgb(255, 165, 0));
-                    context.DrawEllipse(hl, null, obj.Geo,
+                    context.DrawEllipse(
+                        GetBrush(Color.FromRgb(255, 165, 0)), null, obj.Geo,
                         obj.Style.Radius + 3.5, obj.Style.Radius + 3.5);
-                }
-                context.DrawEllipse(new SolidColorBrush(stroke), null, obj.Geo,
+                context.DrawEllipse(
+                    GetBrush(stroke), null, obj.Geo,
                     obj.Style.Radius, obj.Style.Radius);
                 break;
             }
             case DrawObjectType.Path:
             {
-                if (obj.Path == null) break;
-                var geo = obj.Path.ToGeometry();
+                var geo = obj.GetGeometry();
+                if (geo == null) break;
                 if (selected)
-                {
-                    var hlPen = new Pen(
-                        new SolidColorBrush(Color.FromRgb(255, 200, 100)),
-                        obj.Style.Width + 5);
-                    context.DrawGeometry(null, hlPen, geo);
-                }
-                var pen = new Pen(new SolidColorBrush(stroke), obj.Style.Width);
-                context.DrawGeometry(null, pen, geo);
+                    context.DrawGeometry(
+                        null, GetPen(Color.FromRgb(255, 200, 100), obj.Style.Width + 5), geo);
+                context.DrawGeometry(null, GetPen(stroke, obj.Style.Width), geo);
                 break;
             }
         }
@@ -208,7 +231,7 @@ public sealed class DrawingCanvas : Control
 
             var ft = new FormattedText(obj.Id, CultureInfo.CurrentCulture,
                 FlowDirection.LeftToRight, Typeface.Default, 11,
-                new SolidColorBrush(Color.FromRgb(50, 50, 50)));
+                GetBrush(Color.FromRgb(50, 50, 50)));
             context.DrawText(ft, anchor);
         }
     }
@@ -284,6 +307,10 @@ public sealed class DrawingCanvas : Control
         for (var i = doc.Objects.Count - 1; i >= 0; i--)
         {
             var o = doc.Objects[i];
+
+            // 包围盒快速排除，阈值与下方精确判定对齐
+            if (!o.GetBounds().Inflate(4).Contains(p)) continue;
+
             switch (o.Type)
             {
                 case DrawObjectType.Point:
@@ -317,10 +344,12 @@ public sealed class DrawingCanvas : Control
 
         _pointerDown = true;
         _dragStarted = false;
-		_pressPoint = RoundPoint(e.GetPosition(this));
+        _pressPoint = RoundPoint(e.GetPosition(this));
 
         if (Tool == EditorTool.Point && Document != null)
         {
+            BeforeDocumentEdit?.Invoke();
+
             var obj = new DrawObject
             {
                 Id = Document.NextId(DrawObjectType.Point),
@@ -442,6 +471,8 @@ public sealed class DrawingCanvas : Control
 
         var path = ShapePath(Tool, _dragStart, _dragEnd);
         if (path == null || Document == null) return;
+
+        BeforeDocumentEdit?.Invoke();
 
         var obj = new DrawObject
         {

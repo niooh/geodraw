@@ -62,6 +62,7 @@ public partial class MainViewModel
     private void Duplicate()
     {
         if (SelectedObjects.Count == 0) return;
+		PushUndo();
         var created = SelectedObjects.Select(o =>
         {
             var c = CloneWithNewId(o);
@@ -96,9 +97,16 @@ public partial class MainViewModel
                 c.Path = o.Path.Transform(p => GeometryHelper.ReflectThroughPoint(p, center.Geo));
             created.Add(c);
         }
-        ReplaceSelectionWith(created);
-        if (created.Count > 0)
-            Log($"reflect point: {created.Count} object(s) about {center.Id}");
+		if (created.Count == 0)
+		{
+			Log("nothing to transform");
+			return;
+		}
+
+		PushUndo();
+		ReplaceSelectionWith(created);
+		Log($"reflect point: {created.Count} object(s) about {center.Id}");
+	
     }
 
     [RelayCommand]
@@ -180,12 +188,18 @@ public partial class MainViewModel
             }
         }
 
-        ReplaceSelectionWith(created);
-        if (created.Count == 0) return;
+		if (created.Count == 0)
+		{
+			Log("nothing to transform");
+			return;
+		}
 
-        var dir = RotateClockwise ? "CW" : "CCW";
-        Log($"rotate: {created.Count} new object(s), " +
-            $"{RotateAngle:0.#}° × {count} {dir}, center ({center.X:0},{center.Y:0})");
+		PushUndo();
+		ReplaceSelectionWith(created);
+
+		var dir = RotateClockwise ? "CW" : "CCW";
+		Log($"rotate: {created.Count} new object(s), " +
+			$"{RotateAngle:0.#}° × {count} {dir}, center ({center.X:0},{center.Y:0})");
     }
 
     private (Point center, DrawObject? centerObj) ComputeRotateCenter()

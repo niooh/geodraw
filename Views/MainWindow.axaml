@@ -64,6 +64,8 @@
                 <Separator/>
                 <MenuItem Header="Delete selected" Tag="Delete" Click="OnOperateMenuClicked"/>
                 <MenuItem Header="Clear all" Tag="Clear" Click="OnOperateMenuClicked"/>
+				<MenuItem Header="Undo (Ctrl+Z)" Command="{Binding UndoCommand}"/>
+				<MenuItem Header="Redo (Ctrl+Y)" Command="{Binding RedoCommand}"/>
               </MenuFlyout>
             </Button.Flyout>
           </Button>

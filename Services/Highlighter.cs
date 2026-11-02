@@ -26,6 +26,20 @@ public sealed class Highlighter
         }
     }
 
+    /// <summary>一次性取当前有效条目，单帧渲染用，避免逐对象加锁。</summary>
+    public IReadOnlyDictionary<string, Color> Snapshot()
+    {
+        lock (_lock)
+        {
+            var now = DateTime.UtcNow;
+            var result = new Dictionary<string, Color>(_entries.Count);
+            foreach (var (id, entry) in _entries)
+                if (now <= entry.until)
+                    result[id] = entry.color;
+            return result;
+        }
+    }
+
     public void Clear(string id)
     {
         lock (_lock) _entries.Remove(id);
